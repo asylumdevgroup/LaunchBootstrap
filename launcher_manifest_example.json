@@ -1,0 +1,9 @@
+{
+    "latest_version": "v1.0.0",
+    "latest_version_urls": {
+        "linux-amd64": {
+            "url": "https://mc.example.com/launcher_manifest.json",
+            "sha256": "some sha256"
+        }
+    }
+}

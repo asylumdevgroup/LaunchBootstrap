@@ -1,0 +1,5 @@
+{
+	"launcher_manifest": "https://mc.example.com/launcher_manifest.json",
+	"launcher_brand": "Spectrum Indev",
+	"launcher_foldername": "spectrumlauncher"
+}
