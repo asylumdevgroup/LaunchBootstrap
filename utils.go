@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha1"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -20,42 +21,47 @@ func SetUserAgent(bs *BootstrapSettings, req *http.Request) {
 	)
 }
 
-func GetInstalledLauncherVersion(settings *BootstrapSettings, execPath string) (*LauncherVersion, error) {
-	_, err := os.Stat(execPath)
-	if err != nil && !os.IsNotExist(err) {
-		return nil, err
-	} else if err != nil {
-		return &LauncherVersion{
-			Version: NOT_DOWNLOADED,
-		}, nil
+func GetOrCached[T interface{}](bs *BootstrapSettings, cachePath, url string) (*T, error) {
+	cached, cachedErr := LoadFromCache[T](cachePath)
+	// There is no error for file not found or file corrupted
+	// So if we have an error here, there is a deeper issue and we need to raise
+	if cachedErr != nil {
+		return nil, cachedErr
 	}
 
-	versionFilePath := filepath.Join(settings.LauncherPath, "launcher_version.json")
-	_, err = os.Stat(versionFilePath)
-	if err != nil && !os.IsNotExist(err) {
-		return nil, err
-	} else if err != nil {
-		return &LauncherVersion{
-			Version: NOT_DOWNLOADED,
-		}, nil
+	live, liveErr := DoGetRequest[T](bs, url)
+	// If we can't get it but the cache is loaded, no issue
+	// If we can't get it and no cache: CRASH
+	if liveErr != nil && cached != nil {
+		return cached, nil
+	} else if liveErr != nil {
+		return nil, liveErr
 	}
 
-	out, err := os.ReadFile(versionFilePath)
+	// We got it, lets cache it while we're at it!
+	err := os.MkdirAll(filepath.Dir(cachePath), os.ModePerm)
 	if err != nil {
 		return nil, err
 	}
 
-	launcherVersion := LauncherVersion{}
-	err = json.Unmarshal(out, &launcherVersion)
-	return &launcherVersion, err
+	f, err := os.Create(cachePath)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	data, _ := json.MarshalIndent(live, "", "  ")
+	_, err = f.Write(data)
+
+	return live, err
 }
 
-func DownloadManifest(bs *BootstrapSettings) (*LauncherManifest, error) {
+func DoGetRequest[T interface{}](bs *BootstrapSettings, url string) (*T, error) {
 	client := &http.Client{}
 
 	req, err := http.NewRequest(
 		"GET",
-		bs.ManifestURL,
+		url,
 		nil,
 	)
 
@@ -70,13 +76,38 @@ func DownloadManifest(bs *BootstrapSettings) (*LauncherManifest, error) {
 		return nil, err
 	}
 
-	manifest := LauncherManifest{}
-	err = json.NewDecoder(resp.Body).Decode(&manifest)
+	manifest := new(T)
+	err = json.NewDecoder(resp.Body).Decode(manifest)
 	if err != nil {
 		return nil, err
 	}
 
-	return &manifest, nil
+	return manifest, nil
+}
+
+func LoadFromCache[T interface{}](filepath string) (*T, error) {
+	_, err := os.Stat(filepath)
+	if err != nil && !os.IsNotExist(err) {
+		return nil, err
+	} else if err != nil {
+		return nil, nil
+	}
+
+	out, err := os.ReadFile(filepath)
+	if err != nil {
+		return nil, err
+	}
+
+	manifest := new(T)
+	err = json.Unmarshal(out, manifest)
+	if err != nil {
+		// If the file is corrupted
+		// We want to download the new one directly
+		fmt.Println(err)
+		return nil, nil
+	}
+
+	return manifest, nil
 }
 
 func GetHash(filepath string) string {
@@ -87,6 +118,21 @@ func GetHash(filepath string) string {
 	defer f.Close()
 
 	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return ""
+	}
+
+	return fmt.Sprintf("%x", h.Sum(nil))
+}
+
+func GetHashSha1(filepath string) string {
+	f, err := os.Open(filepath)
+	if err != nil {
+		return ""
+	}
+	defer f.Close()
+
+	h := sha1.New()
 	if _, err := io.Copy(h, f); err != nil {
 		return ""
 	}

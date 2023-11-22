@@ -12,15 +12,13 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strconv"
+	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
-	"github.com/Masterminds/semver/v3"
 )
 
 //go:embed bs_settings.json
@@ -79,9 +77,8 @@ func main() {
 		}
 
 		window.SetTitle(settings.Brand + " - Bootstrap")
-		launcherExec, _ := settings.GetLauncherExecutable()
 
-		latestManifest, err := DownloadManifest(&settings)
+		launcherManager, err := GetLauncherManager(&settings)
 		if err != nil {
 			window.SetContent(
 				container.NewVBox(
@@ -93,7 +90,7 @@ func main() {
 			return
 		}
 
-		installedVersion, err := GetInstalledLauncherVersion(&settings, launcherExec)
+		jvmManager, err := GetJvmManager(&settings, launcherManager.launcherManifest.Java)
 		if err != nil {
 			window.SetContent(
 				container.NewVBox(
@@ -105,51 +102,197 @@ func main() {
 			return
 		}
 
-		if installedVersion.Version == NOT_DOWNLOADED {
-			fmt.Println("Not downloaded")
-			DownloadLatestLauncher(&settings, latestManifest, window, launcherExec)
-		} else {
-			currentVersionSemver, err1 := semver.NewVersion(installedVersion.Version)
-			latestVersionSemver, err2 := semver.NewVersion(latestManifest.Version)
+		jvmFilesToDownload, err := jvmManager.ValidateInstallation()
+		if err != nil {
+			window.SetContent(
+				container.NewVBox(
+					widget.NewLabel(Localize("failed_init", map[string]string{"Err": err.Error()})),
+				),
+			)
+			window.CenterOnScreen()
 
-			if err1 != nil || err2 != nil {
-				fmt.Println("Failed to parse semver")
-				fmt.Println("Current: ", err1)
-				fmt.Println("Latest: ", err2)
+			return
+		}
 
-				DownloadLatestLauncher(&settings, latestManifest, window, launcherExec)
-				return
-			}
+		launcherFilesToDownload, err := launcherManager.ValidateInstallation()
+		if err != nil {
+			window.SetContent(
+				container.NewVBox(
+					widget.NewLabel(Localize("failed_init", map[string]string{"Err": err.Error()})),
+				),
+			)
+			window.CenterOnScreen()
 
-			if currentVersionSemver.LessThan(latestVersionSemver) {
-				fmt.Println("Old launcher: " + currentVersionSemver.String() + " / " + latestVersionSemver.String())
-				buttonBox := container.NewHBox(
-					layout.NewSpacer(),
-					widget.NewButton(Localize("skip_button", nil), func() {
-						RunLauncher(&settings, latestManifest, installedVersion, window, launcherExec, false)
-					}),
-					widget.NewButton(Localize("update_button", nil), func() {
-						DownloadLatestLauncher(&settings, latestManifest, window, launcherExec)
-					}),
-				)
+			return
+		}
 
+		filesToDownload := append(jvmFilesToDownload, launcherFilesToDownload...)
+
+		timeLabel := widget.NewLabel("00:00:00")
+		mainProgressBar := widget.NewProgressBar()
+
+		// @TODO Make this base on goroutine to download multiple file at once
+		filenameLabel := widget.NewLabel("-")
+		fileProgressBar := widget.NewProgressBar()
+
+		window.SetContent(container.NewVBox(
+			widget.NewLabel(Localize("downloading", nil)),
+			container.NewHBox(
+				widget.NewLabel(Localize("elapsed_time", nil)),
+				timeLabel,
+			),
+			mainProgressBar,
+			filenameLabel,
+			fileProgressBar,
+		))
+
+		start := time.Now()
+		amtFiles := len(filesToDownload)
+		processedFiles := 0
+		for _, f := range filesToDownload {
+			err := os.MkdirAll(filepath.Dir(f.Path), os.ModePerm)
+			if err != nil {
 				window.SetContent(
 					container.NewVBox(
-						widget.NewLabel(Localize("installed_version", map[string]string{
-							"Version": installedVersion.Version,
-						})),
-						widget.NewLabel(Localize("latest_version", map[string]string{
-							"Version": latestManifest.Version,
-						})),
-						buttonBox,
+						widget.NewLabel(Localize("fail_download", map[string]string{"Err": err.Error()})),
 					),
 				)
 				window.CenterOnScreen()
-			} else {
-				fmt.Println("Launcher up to date")
-				RunLauncher(&settings, latestManifest, installedVersion, window, launcherExec, false)
+
+				return
 			}
 
+			out, err := os.Create(f.Path)
+			if ShowError(window, "fail_download", err) {
+				return
+			}
+
+			done := make(chan int64)
+			go func(f Downloadable) {
+				var stop bool = false
+
+				for {
+					select {
+					case <-done:
+						stop = true
+					default:
+						fi, err := os.Stat(f.Path)
+						if err != nil {
+							log.Fatal(err)
+						}
+
+						currSize := fi.Size()
+						if currSize == 0 {
+							currSize = 1
+						}
+
+						fileProgressBar.SetValue(float64(currSize) / float64(f.Size))
+
+						duration := time.Since(start).Round(time.Second)
+						hours := duration / time.Hour
+						duration -= hours * time.Hour
+						minutes := duration / time.Minute
+						duration -= minutes * time.Minute
+						seconds := duration / time.Second
+
+						timeLabel.SetText(fmt.Sprintf("%02d:%02d:%02d (%v/%v)", hours, minutes, seconds, processedFiles, amtFiles))
+					}
+
+					if stop {
+						break
+					}
+
+					time.Sleep(time.Second)
+				}
+			}(f)
+
+			dlFilePath := strings.TrimPrefix(
+				f.Path,
+				settings.LauncherPath,
+			)
+			if len(dlFilePath) > 20 {
+				dlFilePath = "..." + dlFilePath[len(dlFilePath)-20:]
+			}
+			filenameLabel.SetText(dlFilePath)
+
+			window.CenterOnScreen()
+
+			// @TODO: 3 Retries per file
+			req, err := http.NewRequest("GET", f.Url, nil)
+			if ShowError(window, "fail_download", err) {
+				return
+			}
+
+			resp, err := http.DefaultClient.Do(req)
+			if ShowError(window, "fail_download", err) {
+				return
+			}
+			defer resp.Body.Close()
+
+			n, err := io.Copy(out, resp.Body)
+			if ShowError(window, "fail_download", err) {
+				return
+			}
+
+			out.Close()
+
+			if f.Executable {
+				err := os.Chmod(f.Path, os.ModePerm)
+				if ShowError(window, "fail_download", err) {
+					return
+				}
+			}
+
+			done <- n
+
+			processedFiles += 1
+			mainProgressBar.SetValue(float64(processedFiles) / float64(len(filesToDownload)))
+		}
+
+		// Launching the launcher
+		executablePath := ""
+		classpathSeparator := ":"
+		if runtime.GOOS == "darwin" {
+			executablePath = "jre.bundle/Contents/Home/bin/java"
+		} else if runtime.GOOS == "linux" {
+			executablePath = "bin/java"
+		} else if runtime.GOOS == "windows" {
+			executablePath = "bin/javaw.exe"
+			classpathSeparator = ";"
+		} else {
+			panic("How did we get here?")
+		}
+
+		classpath := []string{}
+		for _, f := range launcherManager.launcherManifest.Files {
+			if f.Type == "classpath" {
+				classpath = append(classpath, filepath.Join(settings.LauncherPath, "launcher", f.Path))
+			}
+		}
+
+		cmd := exec.Command(
+			filepath.Join(jvmManager.GetPath(), executablePath),
+			"-classpath",
+			strings.Join(classpath, classpathSeparator),
+			launcherManager.launcherManifest.MainClass,
+		)
+
+		cmd.Stderr = os.Stderr
+		cmd.Stdout = os.Stdout
+		cmd.Dir = settings.LauncherPath
+
+		if err = cmd.Start(); err != nil {
+			fmt.Println("Failed to run the launcher:")
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		window.Hide()
+
+		if err = cmd.Wait(); err != nil {
+			fmt.Println("Failed to run the launcher:")
+			fmt.Println(err)
+			os.Exit(1)
 		}
 	}()
 
@@ -172,6 +315,7 @@ func ShowError(w fyne.Window, translation string, err error) bool {
 	return false
 }
 
+/*
 func DownloadLatestLauncher(bs *BootstrapSettings, manifest *LauncherManifest, w fyne.Window, launcherExec string) {
 	versionUrl, ok := manifest.Urls[runtime.GOOS+"-"+runtime.GOARCH]
 	if !ok {
@@ -307,64 +451,4 @@ func DownloadLatestLauncher(bs *BootstrapSettings, manifest *LauncherManifest, w
 
 	RunLauncher(bs, manifest, &lv, w, launcherExec, true)
 }
-
-func RunLauncher(bs *BootstrapSettings, manifest *LauncherManifest, installedVersion *LauncherVersion, w fyne.Window, launcherExec string, justDownloaded bool) {
-	if installedVersion.Hash != GetHash(launcherExec) {
-		if manifest == nil {
-			w.SetContent(
-				container.NewVBox(
-					widget.NewLabel(Localize("hash_not_match", nil)),
-				),
-			)
-			w.CenterOnScreen()
-
-			return
-		} else {
-			if justDownloaded {
-				w.SetContent(
-					container.NewVBox(
-						widget.NewLabel(Localize("newly_corrupted", nil)),
-					),
-				)
-				w.CenterOnScreen()
-
-				return
-			}
-
-			DownloadLatestLauncher(bs, manifest, w, launcherExec)
-			return
-		}
-	}
-
-	w.Hide()
-
-	cmd := exec.Command(launcherExec, "--path="+bs.LauncherPath)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	shouldExit := true
-
-	err := cmd.Run()
-	if err != nil {
-		shouldExit = false
-
-		w.Show()
-		w.SetContent(
-			container.NewVBox(
-				widget.NewLabel("Execution stopped: "),
-				widget.NewLabel(err.Error()),
-				widget.NewButton("Exit", func() {
-					w.Close()
-				}),
-			),
-		)
-
-		w.CenterOnScreen()
-
-		return
-	}
-
-	if shouldExit {
-		w.Close()
-	}
-}
+*/

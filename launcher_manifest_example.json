@@ -1,9 +1,16 @@
 {
-    "latest_version": "v1.0.0",
-    "latest_version_urls": {
-        "linux-amd64": {
-            "url": "https://mc.example.com/launcher_manifest.json",
-            "sha256": "some sha256"
+    "version": "v1.0.0",
+    "files": [
+        {
+            "type": "classpath",
+            "path": "launcher.jar",
+            "hash": "sha256 of the launcher.jar",
+            "url": "https://mc.example.com/1.0.0.jar"
         }
+    ],
+    "main_class": "com.skcraft.launcher.FancyLauncher",
+    "jre": {
+        "manifest": "https://launchermeta.mojang.com/v1/products/java-runtime/2ec0cc96c44e5a76b9c8b7c39df7210883d12871/all.json",
+        "component": "java-runtime-gamma"
     }
 }
