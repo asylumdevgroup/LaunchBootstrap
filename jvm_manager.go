@@ -67,7 +67,7 @@ func GetJvmManager(bs *BootstrapSettings, launcherManifest LauncherJavaManifest)
 	// We load the main manifest
 	mainManifest, err := GetOrCached[MainJavaManifest](
 		bs,
-		filepath.Join(bs.LauncherPath, "launcher", "main_java_manifest.json"),
+		filepath.Join(bs.LauncherPath, "launcher/cache", "main_java_manifest.json"),
 		launcherManifest.ManifestURL,
 	)
 	if err != nil {
@@ -88,7 +88,7 @@ func GetJvmManager(bs *BootstrapSettings, launcherManifest LauncherJavaManifest)
 	}
 	versionManifest, err := GetOrCached[JavaManifest](
 		bs,
-		filepath.Join(bs.LauncherPath, "launcher", "java_"+os+"_"+launcherManifest.Component+".json"),
+		filepath.Join(bs.LauncherPath, "launcher/cache", "java_"+os+"_"+launcherManifest.Component+".json"),
 		version[0].Manifest.Url, // @TODO: Check how versions are handled, should we DL the first or the last?
 	)
 	if err != nil {

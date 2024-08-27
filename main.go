@@ -250,6 +250,7 @@ func main() {
 		}
 
 		// Launching the launcher
+		// @TODO: Handle other than java
 		executablePath := ""
 		classpathSeparator := ":"
 		if runtime.GOOS == "darwin" {
@@ -275,6 +276,13 @@ func main() {
 			"-classpath",
 			strings.Join(classpath, classpathSeparator),
 			launcherManager.launcherManifest.MainClass,
+			// @TODO: Add args in the manifest
+			// @TODO: Replace variables (e.g. launcherpath, jvmExecutable, ...)
+			"--portable",
+			"--dir",
+			settings.LauncherPath,
+			"--bootstrap-version",
+			"123",
 		)
 
 		cmd.Stderr = os.Stderr
