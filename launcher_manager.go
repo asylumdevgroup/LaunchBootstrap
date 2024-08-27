@@ -1,9 +1,12 @@
 package main
 
 import (
+	"fmt"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 )
 
 type LauncherManager struct {
@@ -19,7 +22,7 @@ func GetLauncherManager(bs *BootstrapSettings) (*LauncherManager, error) {
 	// We load the main manifest
 	mainManifest, err := GetOrCached[LauncherManifest](
 		bs,
-		filepath.Join(bs.LauncherPath, "launcher", "launcher_manifest.json"),
+		filepath.Join(bs.LauncherPath, ".cache", "launcher_manifest.json"),
 		bs.ManifestURL,
 	)
 	if err != nil {
@@ -40,9 +43,12 @@ func (m *LauncherManager) ValidateInstallation() ([]Downloadable, error) {
 	bp := m.GetPath()
 
 	filesToDownload := []Downloadable{}
+	fileList := []string{}
 
 	for _, v := range m.launcherManifest.Files {
 		file := filepath.Join(bp, v.Path)
+		fileList = append(fileList, file)
+
 		if v.Type == "directory" {
 			err := os.MkdirAll(file, os.ModePerm)
 			if err != nil {
@@ -75,5 +81,25 @@ func (m *LauncherManager) ValidateInstallation() ([]Downloadable, error) {
 		}
 	}
 
-	return filesToDownload, nil
+	// Removing the files that should not exist
+	err := filepath.Walk(bp, func(currPath string, fi fs.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if fi.IsDir() {
+			return nil
+		}
+
+		if !slices.Contains(fileList, currPath) {
+			fmt.Printf("File / dir %v should not exist. Removing it.\n", currPath)
+			if err := os.RemoveAll(currPath); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+
+	return filesToDownload, err
 }

@@ -2,10 +2,13 @@ package main
 
 import (
 	"errors"
+	"fmt"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
 	"runtime"
+	"slices"
 )
 
 var (
@@ -67,7 +70,7 @@ func GetJvmManager(bs *BootstrapSettings, launcherManifest LauncherJavaManifest)
 	// We load the main manifest
 	mainManifest, err := GetOrCached[MainJavaManifest](
 		bs,
-		filepath.Join(bs.LauncherPath, "launcher/cache", "main_java_manifest.json"),
+		filepath.Join(bs.LauncherPath, ".cache", "main_java_manifest.json"),
 		launcherManifest.ManifestURL,
 	)
 	if err != nil {
@@ -88,7 +91,7 @@ func GetJvmManager(bs *BootstrapSettings, launcherManifest LauncherJavaManifest)
 	}
 	versionManifest, err := GetOrCached[JavaManifest](
 		bs,
-		filepath.Join(bs.LauncherPath, "launcher/cache", "java_"+os+"_"+launcherManifest.Component+".json"),
+		filepath.Join(bs.LauncherPath, ".cache", "java_"+os+"_"+launcherManifest.Component+".json"),
 		version[0].Manifest.Url, // @TODO: Check how versions are handled, should we DL the first or the last?
 	)
 	if err != nil {
@@ -109,9 +112,12 @@ func (m *JvmManager) ValidateInstallation() ([]Downloadable, error) {
 	bp := m.GetPath()
 
 	filesToDownload := []Downloadable{}
+	fileList := []string{}
 
 	for k, v := range m.cachedVersionManifest.Files {
 		file := filepath.Join(bp, k)
+		fileList = append(fileList, file)
+
 		if v.Type == "directory" {
 			err := os.MkdirAll(file, os.ModePerm)
 			if err != nil {
@@ -146,5 +152,25 @@ func (m *JvmManager) ValidateInstallation() ([]Downloadable, error) {
 		}
 	}
 
-	return filesToDownload, nil
+	// Removing the files that should not exist
+	err := filepath.Walk(bp, func(currPath string, fi fs.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if fi.IsDir() {
+			return nil
+		}
+
+		if !slices.Contains(fileList, currPath) {
+			fmt.Printf("File / dir %v should not exist. Removing it.\n", currPath)
+			if err := os.RemoveAll(currPath); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+
+	return filesToDownload, err
 }

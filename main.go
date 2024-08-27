@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -26,13 +27,21 @@ var BOOTSTRAP_SETTINGS_STR []byte
 
 var basepath *string
 
-var BOOTSTRAP_VERSION = "1.0.0"
+var BOOTSTRAP_VERSION = "1"
 
 func init() {
 	basepath = flag.String("path", "", "The path to store launcher data (i.e. portable-mode)")
 }
 
 func main() {
+	bsVersion, err := strconv.Atoi(BOOTSTRAP_VERSION)
+	if err != nil {
+		fmt.Println("Failed to parse bootstrap version to an int!")
+		fmt.Println("Version found: ", BOOTSTRAP_VERSION)
+
+		panic(err)
+	}
+
 	flag.Parse()
 
 	app := app.New()
@@ -132,6 +141,7 @@ func main() {
 		mainProgressBar := widget.NewProgressBar()
 
 		// @TODO Make this base on goroutine to download multiple file at once
+		// @TODO which will be hard to display properly like SKCraft
 		filenameLabel := widget.NewLabel("-")
 		fileProgressBar := widget.NewProgressBar()
 
@@ -223,6 +233,8 @@ func main() {
 				return
 			}
 
+			req.Header.Set("User-Agent", "SpectrumBootstrap/"+BOOTSTRAP_VERSION)
+
 			resp, err := http.DefaultClient.Do(req)
 			if ShowError(window, "fail_download", err) {
 				return
@@ -261,6 +273,7 @@ func main() {
 			executablePath = "bin/javaw.exe"
 			classpathSeparator = ";"
 		} else {
+			// I don't currently handle BSD/Solaris/whatever people try to use it on
 			panic("How did we get here?")
 		}
 
@@ -271,18 +284,32 @@ func main() {
 			}
 		}
 
-		cmd := exec.Command(
-			filepath.Join(jvmManager.GetPath(), executablePath),
+		variables := map[string]any{
+			"osArch":     jvmManager.os,
+			"rootPath":   settings.LauncherPath,
+			"bsVersion":  bsVersion,
+			"isPortable": len(*basepath) > 0,
+		}
+
+		cmdStrArr := []string{
 			"-classpath",
 			strings.Join(classpath, classpathSeparator),
 			launcherManager.launcherManifest.MainClass,
-			// @TODO: Add args in the manifest
-			// @TODO: Replace variables (e.g. launcherpath, jvmExecutable, ...)
-			"--portable",
-			"--dir",
-			settings.LauncherPath,
-			"--bootstrap-version",
-			"123",
+		}
+
+		for _, arg := range launcherManager.launcherManifest.Args {
+			val := arg
+
+			for k, v := range variables {
+				val = strings.ReplaceAll(val, "${"+k+"}", fmt.Sprintf("%v", v))
+			}
+
+			cmdStrArr = append(cmdStrArr, val)
+		}
+
+		cmd := exec.Command(
+			filepath.Join(jvmManager.GetPath(), executablePath),
+			cmdStrArr...,
 		)
 
 		cmd.Stderr = os.Stderr
@@ -302,6 +329,8 @@ func main() {
 			fmt.Println(err)
 			os.Exit(1)
 		}
+
+		os.Exit(0)
 	}()
 
 	window.ShowAndRun()
@@ -322,141 +351,3 @@ func ShowError(w fyne.Window, translation string, err error) bool {
 
 	return false
 }
-
-/*
-func DownloadLatestLauncher(bs *BootstrapSettings, manifest *LauncherManifest, w fyne.Window, launcherExec string) {
-	versionUrl, ok := manifest.Urls[runtime.GOOS+"-"+runtime.GOARCH]
-	if !ok {
-		w.SetContent(
-			container.NewVBox(
-				widget.NewLabel(Localize("not_available_os", nil)),
-				widget.NewLabel(runtime.GOOS+" / "+runtime.GOARCH),
-			),
-		)
-		w.CenterOnScreen()
-
-		return
-	}
-
-	_, err := os.Stat(launcherExec)
-	if err == nil {
-		_, err2 := os.Stat(launcherExec + ".old")
-		if err2 == nil {
-			err2 = os.Remove(launcherExec + ".old")
-			if ShowError(w, "fail_delete_old", err2) {
-				return
-			}
-		}
-
-		err = os.Rename(launcherExec, launcherExec+".old")
-		if ShowError(w, "fail_rename_old", err) {
-			return
-		}
-	}
-
-	timeLabel := widget.NewLabel("00:00:00")
-	progressBar := widget.NewProgressBar()
-
-	w.SetContent(container.NewVBox(
-		widget.NewLabel(Localize("downloading", nil)),
-		container.NewHBox(
-			widget.NewLabel(Localize("elapsed_time", nil)),
-			timeLabel,
-		),
-		progressBar,
-	))
-
-	start := time.Now()
-	out, err := os.Create(launcherExec)
-	if ShowError(w, "fail_download", err) {
-		return
-	}
-	defer out.Close()
-
-	headReq, err := http.NewRequest("HEAD", versionUrl["url"], nil)
-	if ShowError(w, "fail_download", err) {
-		return
-	}
-
-	headResp, err := http.DefaultClient.Do(headReq)
-	if ShowError(w, "fail_download", err) {
-		return
-	}
-	defer headResp.Body.Close()
-
-	size, err := strconv.Atoi(headResp.Header.Get("Content-Length"))
-	if ShowError(w, "fail_download", err) {
-		return
-	}
-
-	done := make(chan int64)
-	go func() {
-		var stop bool = false
-
-		for {
-			select {
-			case <-done:
-				stop = true
-			default:
-				fi, err := os.Stat(launcherExec)
-				if err != nil {
-					log.Fatal(err)
-				}
-
-				currSize := fi.Size()
-				if currSize == 0 {
-					currSize = 1
-				}
-
-				progressBar.SetValue(float64(currSize) / float64(size))
-
-				duration := time.Since(start).Round(time.Second)
-				hours := duration / time.Hour
-				duration -= hours * time.Hour
-				minutes := duration / time.Minute
-				duration -= minutes * time.Minute
-				seconds := duration / time.Second
-
-				timeLabel.SetText(fmt.Sprintf("%02d:%02d:%02d", hours, minutes, seconds))
-			}
-
-			if stop {
-				break
-			}
-
-			time.Sleep(time.Second)
-		}
-	}()
-
-	req, err := http.NewRequest("GET", versionUrl["url"], nil)
-	if ShowError(w, "fail_download", err) {
-		return
-	}
-
-	resp, err := http.DefaultClient.Do(req)
-	if ShowError(w, "fail_download", err) {
-		return
-	}
-	defer resp.Body.Close()
-
-	n, err := io.Copy(out, resp.Body)
-	if ShowError(w, "fail_download", err) {
-		return
-	}
-
-	done <- n
-
-	lv := LauncherVersion{
-		Version: manifest.Version,
-		Hash:    versionUrl["sha256"],
-	}
-
-	lvjson, _ := json.Marshal(lv)
-	err = os.WriteFile(filepath.Join(bs.LauncherPath, "launcher_version.json"), lvjson, os.ModePerm)
-	if ShowError(w, "fail_download", err) {
-		return
-	}
-
-	RunLauncher(bs, manifest, &lv, w, launcherExec, true)
-}
-*/

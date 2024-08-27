@@ -43,7 +43,8 @@ The webserver needs to have a `launcher_manifest.json` file containing the follo
     ],
     "main_class": "com.skcraft.launcher.FancyLauncher",
     "args": [
-        "--path",
+        "--portable",
+        "--dir",
         "${rootPath}"
         "--bootstrap-version",
         "${bsVersion}"
@@ -73,6 +74,7 @@ The `args` key should be an array letting you specify the argument to the launch
 Here are the allowed values:
 | Value | Description |
 |-------|-------------|
+| osArch | The os/arch string for downloading a JVM |
 | rootPath | The path for your launcher to use as its root |
 | bsVersion | The bootstrap version |
 | isPortable | Is the bootstrap running in portable mode |
@@ -111,12 +113,10 @@ $ @TODO
 
 ## ROADMAP
 
-- launcher_manifest.json -> args
-- the bs should clear the non wanted files in $basepath/launcher
-- store & use the `$basepath/launcher/latest.json` to know when to update
+- Retry downloads when failed
+- Multi-"threaded" download (multi-goroutines)
 - Implement Python
 - Implement generic executable thing
-- Multi-"threaded" download (multi-goroutines)
 
 ## License
 

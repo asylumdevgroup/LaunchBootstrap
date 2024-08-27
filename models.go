@@ -30,6 +30,7 @@ type LauncherManifest struct {
 	Version   string               `json:"version"`
 	Files     []ManifestFile       `json:"files"`
 	MainClass string               `json:"main_class"`
+	Args      []string             `json:"args"`
 	Java      LauncherJavaManifest `json:"jre"`
 }
 
