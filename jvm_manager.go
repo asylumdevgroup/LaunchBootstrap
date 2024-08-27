@@ -101,7 +101,7 @@ func GetJvmManager(bs *BootstrapSettings, launcherManifest LauncherJavaManifest)
 }
 
 func (m *JvmManager) GetPath() string {
-	return path.Join(m.bSettings.LauncherPath, "runtime", m.launcherManifest.Component, m.os, m.launcherManifest.Component)
+	return path.Join(m.bSettings.LauncherPath, "runtime", m.launcherManifest.Component, m.os)
 }
 
 // Returns a list of files to re-download
