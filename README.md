@@ -111,9 +111,9 @@ Just before building it, we can change the `Icon.png` file to put our custom ico
 Finally compile your executables:
 ```sh
 $ go install github.com/fyne-io/fyne-cross@latest # Do it only once, to install fyne-cross
-$ fyne-cross windows -arch=amd64,arm64 --app-id fr.oxodao.spectrumbs
+$ fyne-cross windows -arch=amd64,arm64 --app-id fr.oxodao.spectrumbs.YOUR_LAUNCHER_NAME
 $ fyne-cross linux -arch=amd64,arm64
-$ fyne-cross darwin -macosx-sdk-path="PATH/TO/DOWNLOADED/SDK" --arch=amd64,arm64 --app-id fr.oxodao.spectrumbs >xc14.3.log # Requires xcode /!\
+$ fyne-cross darwin -macosx-sdk-path="PATH/TO/EXTRACTED/SDK" --arch=amd64,arm64 --app-id fr.oxodao.spectrumbs.YOUR_LAUNCHER_NAME >xc14.3.log # Requires xcode /!\
 ```
 
 See the [fyne-cross repo](https://github.com/fyne-io/fyne-cross) for more info
@@ -131,18 +131,29 @@ Your compiled bootstrap, are available in `fyne-cross/bin/` ready to be uploaded
 
 ## License
 
-Spectrum-Bootstrap - A bootstrap for Minecraft launchers
-Copyright (C) 2023-2024 - Oxodao
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>.
+> Spectrum-Bootstrap - A bootstrap for Minecraft launchers
+>
+>Copyright (C) 2023-2024 - Oxodao
+>
+>
+> This program is free software: you can redistribute it and/or modify
+>
+> it under the terms of the GNU General Public License as published by
+>
+> the Free Software Foundation, either version 3 of the License, or
+>
+> (at your option) any later version.
+>
+>
+> This program is distributed in the hope that it will be useful,
+>
+> but WITHOUT ANY WARRANTY; without even the implied warranty of
+>
+> MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>
+> GNU General Public License for more details.
+>
+>
+> You should have received a copy of the GNU General Public License
+>
+> along with this program.  If not, see <https://www.gnu.org/licenses/>.

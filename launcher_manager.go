@@ -59,6 +59,7 @@ func (m *LauncherManager) GetPath() string {
 // Returns a list of files to re-download
 func (m *LauncherManager) ValidateInstallation() ([]Downloadable, error) {
 	bp := m.GetPath()
+	os.MkdirAll(bp, os.ModePerm)
 
 	filesToDownload := []Downloadable{}
 	fileList := []string{}
