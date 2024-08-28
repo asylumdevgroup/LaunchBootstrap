@@ -102,14 +102,25 @@ Then create a `bs_settings.json` and let's fill it together:
 - `launcher_brand`: The name displayed everywhere for your launcher
 - `launcher_foldername`: The folder name that will be used
 
-N.B. The folder name tries to respect the XDG specs, thus it will store your launcher and its file to `$HOME/.local/share/launchername` on Linux, `@TODO` on OSX and `@TOODO` on Windows.
+N.B. The folder name tries to respect the XDG specs, thus it will store your launcher and its file to `$HOME/.local/share/launchername` on Linux, `@TODO` on OSX and `%APPDATA%/launchername` on Windows.
 
 Please make sure this file is also accessible on `https://mc.example.com/bs_settings.json`. This is not required but if you can't compile one launcher or the other (I'm talking about osx for no particular reason :unamused:) that your user can do it themselves without having to reverse engineer the executable.
 
-Finally compile your executables (@TODO: Maybe make a Github action for this?):
+Just before building it, we can change the `Icon.png` file to put our custom icon for the bootstrap.
+
+Finally compile your executables:
 ```sh
-$ @TODO
+$ go install github.com/fyne-io/fyne-cross@latest # Do it only once, to install fyne-cross
+$ fyne-cross windows -arch=amd64,arm64 --app-id fr.oxodao.spectrumbs
+$ fyne-cross linux -arch=amd64,arm64
+$ fyne-cross darwin -macosx-sdk-path="PATH/TO/DOWNLOADED/SDK" --arch=amd64,arm64 --app-id fr.oxodao.spectrumbs >xc14.3.log # Requires xcode /!\
 ```
+
+See the [fyne-cross repo](https://github.com/fyne-io/fyne-cross) for more info
+
+**Note**: Currently, fyne-cross do not support building for Windows ARM64 nor OSX ARM64.
+
+Your compiled bootstrap, are available in `fyne-cross/bin/` ready to be uploaded to your webhost to distribute to your players.
 
 ## ROADMAP
 
@@ -120,5 +131,18 @@ $ @TODO
 
 ## License
 
-@TODO: Apache2 WITH NOTICE FILE !!
-cf: https://opensource.stackexchange.com/questions/8161/license-that-requires-attribution-to-end-users
+Spectrum-Bootstrap - A bootstrap for Minecraft launchers
+Copyright (C) 2023-2024 - Oxodao
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
