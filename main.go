@@ -116,8 +116,32 @@
 			 window.CenterOnScreen()
 			 return
 		 }
+
+		 // Always attempt to get the legacy JVM manager
+		 jvmManagerLegacy, errLegacy := GetJvmManagerLegacy(&settings, launcherManager.launcherManifest.Java)
+		 if errLegacy != nil {
+			 window.SetContent(
+				 container.NewVBox(
+					 widget.NewLabel(Localize("failed_init", map[string]string{"Err": errLegacy.Error()})),
+				 ),
+			 )
+			 window.CenterOnScreen()
+			 return
+		 }
  
 		 jvmFilesToDownload, err := jvmManager.ValidateInstallation()
+		 if err != nil {
+			 window.SetContent(
+				 container.NewVBox(
+					 widget.NewLabel(Localize("failed_init", map[string]string{"Err": err.Error()})),
+				 ),
+			 )
+			 window.CenterOnScreen()
+			 return
+		 }
+
+		  
+		 jvmFilesToDownloadLegacy, err := jvmManagerLegacy.ValidateInstallationLegacy()
 		 if err != nil {
 			 window.SetContent(
 				 container.NewVBox(
@@ -139,8 +163,7 @@
 			 return
 		 }
  
-		 filesToDownload := append(jvmFilesToDownload, launcherFilesToDownload...)
- 
+		 filesToDownload := append(append(jvmFilesToDownload, jvmFilesToDownloadLegacy...), launcherFilesToDownload...) 
 		 timeLabel := widget.NewLabel("00:00:00")
 		 mainProgressBar := widget.NewProgressBar()
 		 filenameLabel := widget.NewLabel("-")
