@@ -10,7 +10,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macos-13, windows-latest]
+        os: [windows-latest]
 
     steps:
     - name: Checkout repository
@@ -21,13 +21,12 @@ jobs:
       with:
         go-version: '1.21'
 
-    - name: Build
-      run: go build -o RetroNautsMC-Launcher -v ./... 
+    - name: Build RetroNautsMC Launcher
+      run: go build -o RetroNautsMC-Launcher.exe -ldflags -H=windowsgui -v ./... 
 
     - name: Upload Build Artifact
       if: success()
       uses: actions/upload-artifact@v3
       with:
         name: RetroNautsMC-${{ matrix.os }}
-        path: |
-          ./RetroNautsMC-Launcher*
+        path: ./RetroNautsMC-Launcher.exe
