@@ -10,7 +10,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [windows-latest]
 
     steps:
     - name: Checkout repository
@@ -19,15 +19,14 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
-        go-version: '1.20'
+        go-version: '1.21'
 
-    - name: Build
-      run: go build -v ./... -o RetroNautsMC-Launcher
+    - name: Build RetroNautsMC Launcher
+      run: go build -o RetroNautsMC-Launcher.exe -ldflags -H=windowsgui -v ./... 
 
     - name: Upload Build Artifact
       if: success()
       uses: actions/upload-artifact@v3
       with:
         name: RetroNautsMC-${{ matrix.os }}
-        path: |
-          ./RetroNautsMC-Launcher*
+        path: ./RetroNautsMC-Launcher.exe
