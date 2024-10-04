@@ -42,6 +42,7 @@ type ManifestFile struct {
 type LauncherJavaManifest struct {
 	ManifestURL string `json:"manifest"`
 	Component   string `json:"component"`
+	ComponentLegacy string `json:"componentLegacy"`
 }
 
 type LauncherManifest struct {
@@ -83,7 +84,6 @@ type MainJavaManifestVersion struct {
 	} `json:"version"`
 }
 
-// mjm["linux"]["java-runtime-gamma"]
 type MainJavaManifest map[string]map[string][]MainJavaManifestVersion
 
 type Downloadable struct {
