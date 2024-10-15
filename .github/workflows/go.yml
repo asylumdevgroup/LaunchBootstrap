@@ -1,4 +1,4 @@
-name: RetroNautsMC Bootstrapper
+name: Asylum Bootstrapper
 
 on:
   push:
@@ -22,11 +22,11 @@ jobs:
         go-version: '1.21'
 
     - name: Build RetroNautsMC Launcher
-      run: go build -o RetroNautsMC-Launcher.exe -ldflags -H=windowsgui -v ./... 
+      run: go build -o AsylumApp.exe -ldflags -H=windowsgui -v ./... 
 
     - name: Upload Build Artifact
       if: success()
       uses: actions/upload-artifact@v3
       with:
         name: RetroNautsMC-${{ matrix.os }}
-        path: ./RetroNautsMC-Launcher.exe
+        path: ./AsylumApp.exe
