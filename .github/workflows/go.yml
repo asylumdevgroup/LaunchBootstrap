@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-name: Launcher Bootstrapper
-=======
 name: Asylum Bootstrapper
->>>>>>> ce1e96f84b6a9a051cb587b35261fe3274801de9
 
 on:
   push:
